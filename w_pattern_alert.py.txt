@@ -174,6 +174,46 @@ def run_once():
     else:
         print("⚠️ 回測：本次無交易信號。")
 
+# 准备要发给 Telegram 的讯息
+if not results_df.empty:
+    # 构造一个较简明的文本内容
+    message_lines = []
+    for idx, row in results_df.iterrows():
+        entry_t = row['entry_time'].strftime("%Y-%m-%d %H:%M")
+        exit_t  = row['exit_time'].strftime("%Y-%m-%d %H:%M")
+        profit = row['profit_pct']
+        message_lines.append(f"📈 进场: {entry_t} 价格 {row['entry']:.2f}\n"
+                             f"📉 出场: {exit_t} 价格 {row['exit']:.2f}\n"
+                             f"💰 收益: {profit:.2f}%\n"
+                             "—")
+    cumulative = f"累积收益: {cum_ret:.2f}%（初始资金 {INITIAL_CAPITAL:.2f}）"
+    message_text = "\n".join(message_lines + [cumulative])
+else:
+    message_text = "⚠️ 今日无 W 底交易信号。"
+
+# 读取仓库 secrets 环境变量
+bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
+chat_id   = os.environ.get("TELEGRAM_CHAT_ID")
+
+# 透过 Telegram Bot API 发送消息
+if bot_token and chat_id:
+    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    payload = {
+        "chat_id": chat_id,
+        "text": message_text,
+        "parse_mode": "Markdown"  # 可选：Markdown 解析
+    }
+    try:
+        r = requests.post(url, json=payload, timeout=10)
+        r.raise_for_status()
+        print("✅ Telegram 推送成功")
+    except Exception as e:
+        print("❌ Telegram 推送失败：", e)
+else:
+    print("⚠️ 未设置 TELEGRAM_BOT_TOKEN 或 TELEGRAM_CHAT_ID，无法推送 Telegram")
+
+
+
     # 7. （選用）畫一張圖，標出進/出場
     #    如果你想在 GitHub Actions 上產生圖片檔，可以把下面這段取消註解，存成 png：
     #
